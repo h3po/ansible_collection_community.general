@@ -248,17 +248,20 @@ class ProxmoxSnapAnsible(ProxmoxAnsible):
         while timeout:
             if self.api_task_ok(vm['node'], taskid):
                 break
-            if timeout == 0:
-                self.module.fail_json(msg='Reached timeout while waiting for creating VM snapshot. Last line in task before timeout: %s' %
-                                      self.proxmox_api.nodes(vm['node']).tasks(taskid).log.get()[:1])
 
             time.sleep(1)
             timeout -= 1
+
         if vm['type'] == 'lxc' and unbind is True and mountpoints:
             self._container_mp_restore(vm, vmid, timeout, unbind, mountpoints, vmstatus)
 
+        if timeout == 0:
+            self.module.fail_json(msg='Reached timeout while waiting for creating VM snapshot. Last line in task before timeout: %s' %
+                                  self.proxmox_api.nodes(vm['node']).tasks(taskid).log.get()[:1])
+            return False
+
         self.snapshot_retention(vm, vmid, retention)
-        return timeout > 0
+        return True
 
     def snapshot_remove(self, vm, vmid, timeout, snapname, force):
         if self.module.check_mode:
@@ -268,12 +271,13 @@ class ProxmoxSnapAnsible(ProxmoxAnsible):
         while timeout:
             if self.api_task_ok(vm['node'], taskid):
                 return True
-            if timeout == 0:
-                self.module.fail_json(msg='Reached timeout while waiting for removing VM snapshot. Last line in task before timeout: %s' %
-                                      self.proxmox_api.nodes(vm['node']).tasks(taskid).log.get()[:1])
 
             time.sleep(1)
             timeout -= 1
+
+        self.module.fail_json(msg='Reached timeout while waiting for removing VM snapshot. Last line in task before timeout: %s' %
+                              self.proxmox_api.nodes(vm['node']).tasks(taskid).log.get()[:1])
+
         return False
 
     def snapshot_rollback(self, vm, vmid, timeout, snapname):
@@ -284,14 +288,14 @@ class ProxmoxSnapAnsible(ProxmoxAnsible):
         while timeout:
             if self.api_task_ok(vm['node'], taskid):
                 return True
-            if timeout == 0:
-                self.module.fail_json(msg='Reached timeout while waiting for rolling back VM snapshot. Last line in task before timeout: %s' %
-                                      self.proxmox_api.nodes(vm['node']).tasks(taskid).log.get()[:1])
 
             time.sleep(1)
             timeout -= 1
-        return False
 
+        self.module.fail_json(msg='Reached timeout while waiting for rolling back VM snapshot. Last line in task before timeout: %s' %
+                              self.proxmox_api.nodes(vm['node']).tasks(taskid).log.get()[:1])
+
+        return False
 
 def main():
     module_args = proxmox_auth_argument_spec()
